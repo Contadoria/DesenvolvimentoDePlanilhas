@@ -1,0 +1,119 @@
+<script>
+
+/*
+* Página de configurações, carrega antes de todas as demais
+**/
+
+/*
+* Sempre alterar para false quando for publicar
+**/
+const MODO_DESENVOLVIMENTO = false;
+
+/*
+* Disponibiliza o objeto global da
+* API do Google para uso interno
+* nos componentes como 'this.$google'
+**/
+Vue.prototype.$google = google;
+
+/*
+* Disponibiliza a biblioteca auxiliar
+* nos componentes como 'this.$utils' 
+**/
+Vue.prototype.$utils = Utils;
+Vue.prototype.$marked = marked;
+Vue.prototype.$log = function(payload) {
+    if (MODO_DESENVOLVIMENTO) {
+        console.log('*** DEBUG_LOG');
+        console.log(payload);
+    }
+};
+
+/*
+* Define a rotina de tratamento de erros
+* para todos os componentes
+**/
+Vue.prototype.$errorHandler = function (e) {
+    google.script.run.registrarErro(e);
+};
+
+/*
+* Estabele parâmetros gerais da UI
+* para todos os componentes
+**/
+
+const TITULO_ERRO_PADRAO = 'Erro';
+const MENSAGEM_ERRO_PADRAO = '<p>Houve um erro na comunicação com o servidor.</p>';
+const TITULO_SUCESSO_PADRAO = 'Concluído';
+const MENSAGEM_SUCESSO_PADRAO = '<p>A operação foi concluída com sucesso.</p>';
+
+/*
+* Inicia a Vuex store
+**/
+
+Vue.use(Vuex);
+
+const store = new Vuex.Store({
+    state: {
+        planilha: {
+            nome: '',
+            id: '',
+            tipo: '',
+            versao: '',
+            pastaDesenvolvimento: false,
+        },
+        chaveGithub: {
+           usuario: '',
+           valor: '',
+           novo: ''
+        },
+        registro: [],
+        erro: false,
+        info: false,
+        alerta: false,
+        sucesso: false,
+        msgErro: MENSAGEM_ERRO_PADRAO,
+        msgInfo: '',
+        msgAlerta: '',
+        msgSucesso: MENSAGEM_SUCESSO_PADRAO
+    },
+    mutations: {
+        atualizarDadosPlanilha(state, dados) {
+            state.planilha = dados;
+        },
+        atualizarDadosChaveGithub(state, dados) {
+            state.chaveGithub = dados;
+        },
+        atualizarDadosRegistro(state, dados) {
+            state.registro = dados;
+        },
+        notificarErro(state, msg) {
+            state.msgErro = msg;
+            state.erro = true;
+        },
+        notificarInfo(state, msg) {
+            state.msgInfo = msg;
+            state.info = true;
+        },
+        notificarAlerta(state, msg) {
+            state.msgAlerta = msg;
+            state.alerta = true;
+        },
+        notificarSucesso(state, msg) {
+            state.msgSucesso = msg;
+            state.sucesso = true;
+        },
+        fecharNotificacoes(state) {
+            state.erro = false;
+            state.info = false;
+            state.alerta = false;
+            state.sucesso = false;
+            state.msgErro = MENSAGEM_ERRO_PADRAO;
+            state.msgInfo = '';
+            state.msgAlerta = '';
+            state.msgSucesso = MENSAGEM_SUCESSO_PADRAO;
+        }
+    }
+});
+
+</script>

@@ -1,0 +1,113 @@
+<script>
+
+/*
+ * Página principal da UI, com a barra de navegação e a barra lateral de ajuda.
+ * Aqui estão todos os pontos de entrada.
+ * A configuração é feita pelo objeto 'ui'
+ **/
+var vm = new Vue({
+    el: '#app',
+    store,
+    template: `
+        <div :style="cssPagina">
+            <div v-if="inicializado && !carregando">
+                <div class="w3-bar w3-top w3-card-4 w3-light-gray" :style="cssDados">
+                    <div class="w3-bar-item w3-left" :title="planilha.id">
+                        <span style="line-height:100%; vertical-align: middle; color: grey;" :title="planilha.id"> {{ planilha.nome }} </span>
+                        <span style="line-height:100%; vertical-align: middle; color: grey;"> {{ ' (' + planilha.tipo + ', ' + planilha.versao + ')' }} </span>
+                        <br>
+                        <span style="line-height:100%; vertical-align: middle;" :style="{ textDecoration: planilha.pastaDesenvolvimento ? 'none' : 'line-through', color: planilha.pastaDesenvolvimento ? 'blue' : 'grey' }">Pasta desenvolvimento</span>
+                    </div>
+                </div>
+                <ui-tabs v-if="inicializado && !carregando" :icons="icons" :components="components"></ui-tabs>
+            </div>
+            <ui-spinner v-if="carregando" size="normal" overlay></ui-spinner>
+            <ui-dialog v-if="erroInicializacao" type="error" :title="TITULO_ERRO_PADRAO" :message="MENSAGEM_ERRO_PADRAO" :show-close-mark="false"></ui-dialog>
+            <ui-dialog v-if="notificarErro" type="error" animated :title="TITULO_ERRO_PADRAO" :message="msgErro" :show-close-mark="true" @close="fecharNotificacao()"></ui-dialog>
+            <ui-dialog v-if="notificarAlerta" type="alert" animated title="Aviso" :message="msgAlerta" @close="fecharNotificacao()"></ui-dialog>
+            <ui-dialog v-if="notificarInfo" type="info" animated title="Info" :message="msgInfo" :show-close-mark="true" @close="fecharNotificacao()"></ui-dialog>
+            <ui-toast v-if="notificarSucesso" animated :message="msgSucesso" :show-close-mark="false" @close="fecharNotificacao()"></ui-toast>
+        </div>
+    `,
+    data: {
+        cssPagina: {
+            width: "300px",
+            paddingTop: '66px'
+        },
+        cssDados: {
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+        },
+        icons: ['share', 'refresh', 'sliders', 'book', 'trash'],
+        components: ['item-publicar', 'item-atualizar', 'item-configurar', 'item-criar-documentacao', 'item-limpar-planilha'],
+        carregando: true,
+        inicializado: true,
+        erroInicializacao: false,
+    },
+    computed: {
+        planilha() {
+            return this.$store.state.planilha;
+        },
+        notificarErro() {
+            return this.$store.state.erro;
+        },
+        notificarSucesso() {
+            return this.$store.state.sucesso;
+        },
+        notificarAlerta() {
+            return this.$store.state.alerta;
+        },
+        notificarInfo() {
+            return this.$store.state.info;
+        },
+        msgErro() {
+            return this.$store.state.msgErro;
+        },
+        msgSucesso() {
+            return this.$store.state.msgSucesso;
+        },
+        msgAlerta() {
+            return this.$store.state.msgAlerta;
+        },
+        msgInfo() {
+            return this.$store.state.msgInfo;
+        },
+    },
+    methods: {
+        obterDados() {
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    try {
+                        var dados = JSON.parse(resposta);
+                        context.$log(dados);
+                        context.$store.commit('atualizarDadosPlanilha', dados.planilha);
+                        context.$store.commit('atualizarDadosChaveGithub', dados.chaveGithub);
+                        context.$store.commit('atualizarDadosRegistro', dados.registro);
+                        context.carregando = false;
+                        context.inicializado = true;
+                    } catch (erro) {
+                        context.$errorHandler(erro);
+                        context.carregando = false;
+                        context.erroInicializacao = true;
+                        context.$log(erro);
+                    }
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log(erro);
+                    context.carregando = false;
+                    context.erroInicializacao = true;
+                })
+                .withUserObject(this)
+                .obterDados();
+        },
+        fecharNotificacao() {
+            this.$store.commit('fecharNotificacoes');
+        },
+    },
+    mounted() {
+        this.obterDados();
+    }
+});
+
+</script>

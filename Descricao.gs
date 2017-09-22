@@ -1,8 +1,15 @@
 /**
 * @fileOverview
-* Funções customizadas para consulta a índices de atualização e juros utilizados no cálculo de benefícios previdenciários.
-* Os índices são obtidos diretamente do BACEN e do IBGE mediante a utilização dos serviços SGS (SOAP) e Sidra (REST).
+* Ferramentas para desenvolvimento de planilhas de cálculo.
 *
-* Dependências: SGSBacen, SidraIBGE
-* Escopos: https://www.googleapis.com/auth/script.external_request
+* @NotOnlyCurrentDoc
+*
+* Dependências: Utils, Planilhas
+* Escopos: https://www.googleapis.com/auth/documents
+*          https://www.googleapis.com/auth/drive
+*          https://www.googleapis.com/auth/groups
+*          https://www.googleapis.com/auth/script.external_request
+*          https://www.googleapis.com/auth/script.storage
+*          https://www.googleapis.com/auth/spreadsheets
+*          https://www.googleapis.com/auth/userinfo.email
 */

@@ -1,0 +1,696 @@
+<script>
+
+/*
+* Componentes do menu principal: 
+* 'item-publicar', 'item-atualizar', 'item-configurar', 'item-criar-documentacao', 'item-limpar-planilha'.
+**/
+
+Vue.component('item-publicar', {
+    template: `
+        <div>
+            <div v-if="!planilha.pastaDesenvolvimento" class="w3-card w3-white w3-margin w3-padding w3-display-container">
+                <p>
+                    <span style="color: orangered;"><b>Cuidado. </b></span>
+                    Você <B>NÃO</B> está trabalhando na pasta de desenvolvimento.
+                    Publicar uma planilha não compartilhada entre os desenvolvedores pode comprometer a integridade das fontes.
+                </p>
+                <p>Para publicar mesmo assim, clique no cadeado.</p>
+                <div v-if="!planilha.pastaDesenvolvimento" class="w3-display-bottomright w3-padding">
+                    <ui-icon :icon="aberto ? 'unlock' : 'lock'" size="lg" class="w3-hover-opacity" @click.native="aberto = !aberto"></ui-icon>
+                </div>
+            </div>
+            <div class="w3-card w3-white w3-margin">
+                <header class="w3-container w3-display-container" style="background-color: #D1C4E9">
+                    <p>
+                        <ui-icon icon="share" fixed></ui-icon>
+                        Publicar
+                    </p>
+                </header>
+                <ui-animation-slide>
+                    <div v-show="aberto">
+                        <div class="w3-padding w3-padding-16">
+                            <ui-button-group :labels="['MAJOR', 'MINOR', 'PATCH']" width="78px" v-model="tipoAtualizacao"></ui-button-group>
+                        </div>
+                        <div class="w3-container">
+                            <textarea v-show="!preview && !publicando" v-model="texto" @input="parse()" :style="cssTextArea" placeholder="Descreva as alterações sucintamente..."></textarea>
+                            <div v-show="preview && !publicando" class="markdown-body" :style="cssTextArea" style="border: 1px solid lightgrey; margin-bottom: 5px; padding: 8px; font-size: xx-small;">
+                                <div v-html="textoCompilado"></div>
+                            </div>
+                            <div v-show="publicando" v-ui-automatic-scroll :style="cssTextArea" style="border: 1px solid lightgrey; margin-bottom: 5px; padding: 8px; font-size: 80%; line-height: 0.8em;">
+                                <div v-html="progresso"></div>
+                                <p v-show="publicacaoConcluida" style="font-weight: bold; user-select: none; cursor: pointer;" class="w3-right w3-margin" @click="fechar()">[x fechar]</p>
+                            </div>
+                        </div>
+                        <footer class="w3-container w3-display-container" style="padding-top: 8px; padding-bottom: 16px;">
+                            <i v-if="!publicando" class="w3-display-topright w3-padding w3-text-grey w3-hover-opacity fa fa-lg" :class="preview ? 'fa-eye-slash' : 'fa-eye'" style="font-size: 1.7em; margin-right: 5px; margin-top: 5px;" @click="preview = !preview"></i>
+                            <ui-button icon="bolt" :loading="publicando" @click.native="info = true">Publicar</ui-button>
+                        </footer>
+                    </div>
+                </ui-animation-slide>
+                <ui-dialog v-if="info" type="info" animated title="Dados da nova versão" :message="textoNovaVersao" @close="fechar()">
+                    <ui-button class="action" @click.native="iniciarPublicacao()">Confirmar</ui-button>
+                    <ui-button @click.native="fechar()">Cancelar</ui-button>
+                </ui-dialog>
+            </div>
+        </div>
+        `,
+    data() {
+        return {
+            cssTextArea: {
+                width: '100%',
+                height: '200px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                wordWrap: 'break-word',
+                whiteSpace: 'pre-wrap',
+                resize: 'none'
+            },
+            tipoAtualizacao: 2,
+            publicando: false,
+            publicacaoConcluida: false,
+            texto: '',
+            textoCompilado: '',
+            preview: false,
+            progresso: '',
+            id: '',
+            info: false,
+            aberto: false,
+        }
+    },
+    computed: {
+        planilha() {
+            return this.$store.state.planilha;
+        },
+        novaVersao() {
+            var elementos = /.*(\d{1,})\.(\d{1,})\.(\d{1,})/.exec(this.planilha.versao);
+            if (!Array.isArray(elementos) || elementos.length <= 3) {
+                return null;
+            } else {
+                var major = Utils.isNumeric(elementos[1]) ? parseFloat(elementos[1]) : 0;
+                var minor = Utils.isNumeric(elementos[2]) ? parseFloat(elementos[2]) : 0;
+                var patch = Utils.isNumeric(elementos[3]) ? parseFloat(elementos[3]) : 0;
+                major = this.tipoAtualizacao === 0 ? major + 1 : major;
+                minor = this.tipoAtualizacao === 0 ? 0 : (this.tipoAtualizacao === 1 ? minor + 1 : minor);
+                patch = this.tipoAtualizacao === 0 ? 0 : (this.tipoAtualizacao === 1 ? 0 : patch + 1);
+                return major + '.' + minor + '.' + patch;
+            }
+        },
+        textoNovaVersao() {
+            return '<p class="w3-panel w3-light-grey w3-padding w3-round">' 
+            + this.novaVersao 
+            + '</p>' 
+            + '<div class="markdown-body" style="border: 1px solid lightgrey; margin-bottom: 5px; padding: 8px; font-size: xx-small;">' 
+            + this.textoCompilado 
+            + '</div>';
+        }
+    },
+    methods: {
+        parse() {
+            this.textoCompilado = this.$marked(this.texto);
+        },
+        atualizarProgresso(texto, cor) {
+            this.progresso += '<br><pre style="white-space: pre-wrap; word-wrap: break-word; line-height: 0.8em; padding: 0; margin: 0; color: ' + cor + '">' + texto + '</pre>';
+        },
+        iniciarPublicacao() {
+            this.fechar();
+            this.publicando = true;
+            this.atualizarProgresso('Script de publicação iniciado...', 'black');
+            this.moverParaBackup();
+        },
+        moverParaBackup() {
+            this.atualizarProgresso('Movendo planilha antiga para backup...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.atualizarProgresso('Planilha ' + dados + ' movida para pasta de backup.', 'green');
+                context.atualizarVersao();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.atualizarVersao(); // a falha desta rotina não prejudica o restante
+            })
+            .withUserObject(this)
+            .moverParaBackup();
+        },
+        atualizarVersao() {
+            this.atualizarProgresso('Atualizando dados da versão...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.atualizarProgresso('Dados da nova versão (' + dados + ') atualizados na planilha.', 'green');
+                context.copiarParaDistribuicao();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.publicacaoConcluida = true;
+            })
+            .withUserObject(this)
+            .atualizarVersao(this.novaVersao, this.texto);
+        },
+        copiarParaDistribuicao() {
+            this.atualizarProgresso('Copiando planilha para pasta de distribuição...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.id = dados;
+                context.atualizarProgresso('Planilha copiada para a pasta de distribuição.', 'green');
+                context.apagarDados();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.publicacaoConcluida = true;
+            })
+            .withUserObject(this)
+            .copiarParaDistribuicao();
+        },
+        apagarDados() {
+            this.atualizarProgresso('Iniciando limpeza...<br>Apagando dados na planilha...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.atualizarProgresso(dados, 'green');
+                context.apagarNotas();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.apagarNotas(); // a falha desta rotina não prejudica o restante
+            })
+            .withUserObject(this)
+            .limparDadosNaPlanilha(this.id);
+        },
+        apagarNotas() {
+            this.atualizarProgresso('Apagando notas...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.atualizarProgresso(dados, 'green');
+                context.ocultarPaginas();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.ocultarPaginas(); // a falha desta rotina não prejudica o restante
+            })
+            .withUserObject(this)
+            .limparNotasNaPlanilha(this.id);
+        },
+        ocultarPaginas() {
+            this.atualizarProgresso('Ocultando páginas...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.atualizarProgresso(dados, 'green');
+                context.excluirPaginas();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.excluirPaginas(); // a falha desta rotina não prejudica o restante
+            })
+            .withUserObject(this)
+            .ocultarPaginasNaPlanilha(this.id);
+        },
+        excluirPaginas() {
+            this.atualizarProgresso('Excluindo páginas...', 'black');
+            this.$google.script.run
+            .withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.atualizarProgresso(dados, 'green');
+                context.obterDadosDaPlanilha();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.obterDadosDaPlanilha(); // a falha desta rotina não prejudica o restante
+            })
+            .withUserObject(this)
+            .excluirPaginasNaPlanilha(this.id);
+        },
+        obterDadosDaPlanilha() {
+            this.atualizarProgresso('Obtendo dados da planilha...', 'black');
+            this.$google.script.run.withSuccessHandler(function(resposta, context) {
+                var dados = JSON.parse(resposta);
+                context.$log(dados);
+                context.$store.commit('atualizarDadosPlanilha', dados);
+                context.atualizarProgresso('Dados da planilha obtidos.', 'green');
+                context.finalizarPublicacao();
+            })
+            .withFailureHandler(function(erro, context) {
+                context.$log('ERRO ===> ' + erro);
+                context.atualizarProgresso(erro.message, 'red');
+                context.finalizarPublicacao();
+            })
+            .withUserObject(this)
+            .obterDadosDaPlanilha();
+        },
+        finalizarPublicacao() {
+            this.atualizarProgresso('Script concluído.', 'black');
+            this.publicacaoConcluida = true;
+        },
+        fechar() {
+            this.etapa = 0;
+            this.publicando = false;
+            this.publicacaoConcluida = false;
+            this.preview = false;
+            this.progresso = '';
+            this.id = '';
+            this.info = false;
+        }
+    },
+    mounted() {
+        this.aberto = this.planilha.pastaDesenvolvimento;
+    }
+});
+
+Vue.component('item-atualizar', {
+    template: `
+        <div class="w3-card w3-white w3-margin">
+            <header class="w3-container" style="background-color: #C5CAE9;">
+                <p>
+                    <ui-icon icon="refresh" fixed></ui-icon>
+                    Atualizações
+                </p>
+            </header>
+            <div class="w3-container w3-padding-16">
+                <ui-button icon="line-chart" :loading="atualizandoIndices" :disabled="atualizandoTabelas" @click.native="atualizarIndices()">Índices</ui-button>
+                <ui-button icon="table" :loading="atualizandoTabelas" :disabled="atualizandoIndices" @click.native="atualizarTabelas()">Tabelas</ui-button>
+            </div>
+        </div>
+        `,
+    data() {
+        return {
+            atualizandoIndices: false,
+            atualizandoTabelas: false,
+        }
+    },
+    methods: {
+        atualizarIndices() {
+            this.atualizandoIndices = true;
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    var dados = JSON.parse(resposta);
+                    context.$log(resposta);
+                    context.atualizandoIndices = false;
+                    context.$store.commit('notificarInfo', dados || '<p>Nenhum resultado foi informado pelo servidor.</p>');
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log('ERRO ===> ' + erro);
+                    context.atualizandoIndices = false;
+                    context.$store.commit('notificarErro', erro.message);
+                })
+                .withUserObject(this)
+                .atualizarIndices();
+        },
+        atualizarTabelas() {
+            this.atualizandoTabelas = true;
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    var dados = JSON.parse(resposta);
+                    context.$log(resposta);
+                    context.atualizandoTabelas = false;
+                    context.$store.commit('notificarInfo', dados || '<p>Nenhum resultado foi informado pelo servidor.</p>');
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log('ERRO ===> ' + erro);
+                    context.atualizandoTabelas = false;
+                    context.$store.commit('notificarErro', erro.message);
+                })
+                .withUserObject(this)
+                .atualizarTabelas();
+        },
+        fechar() {
+            this.atualizandoIndices = false;
+            this.atualizandoTabelas = false;
+        }
+    },
+});
+
+Vue.component('item-configurar', {
+    template: `
+        <div>
+            <div class="w3-card w3-white w3-margin">
+                <header class="w3-container" style="background-color: #B0BEC5;">
+                    <p>
+                        <ui-icon icon="github" fixed></ui-icon>
+                        Chave Github
+                    </p>
+                </header>
+                <ul class="w3-ul">
+                    <li style="padding-top:0;padding-bottom:0;">
+                        <div style="padding-top:8px;padding-bottom:8px;">
+                            <div class="w3-display-container w3-text-grey">
+                                <span><b> {{ chave.usuario }} </b></span>
+                                <span class="w3-display-right w3-display-hover w3-hover-opacity" @click="editarChave = !editarChave">
+                                    <ui-icon :icon="editarChave ? 'times' : 'pencil'"></ui-icon>
+                                </span>
+                            </div>
+                            <div v-if="chave.valor" class="w3-tiny w3-text-blue" :style="cssDados">
+                                {{ chave.valor }} 
+                            </div>
+                            <div v-else class="w3-tiny w3-text-gray">
+                                <em>Nenhuma chave cadastrada</em>
+                            </div>
+                        </div>
+                        <ui-animation-slide>
+                            <div v-show="editarChave" style="padding-top:8px;padding-bottom:8px;">
+                                <div>
+                                    <textarea v-model.trim="chave.novo" rows="2" style="width: 100%"></textarea>
+                                </div>
+                                <div style="padding-top:8px;padding-bottom:8px;">
+                                    <ui-button icon="cloud-upload"
+                                            :loading="salvandoChave" 
+                                            :disabled="chave.novo === chave.valor || chave.novo.length === 0 || salvandoChave"
+                                            @click.native="salvarChave()">
+                                            Salvar
+                                    </ui-button>
+                                </div>
+                            </div>
+                        </ui-animation-slide>
+                    </li>
+                </ul>
+            </div>
+            <div class="w3-card w3-white w3-margin">
+                    <header class="w3-container" style="background-color: #CFD8DC;">
+                    <p>
+                        <ui-icon icon="link" fixed></ui-icon>
+                        Gerenciar Ids e Urls
+                    </p>
+                </header>
+                <ul class="w3-ul">
+                    <template v-if="registro.length > 0">
+                        <li v-for="(item, index) in registro" style="padding-top:0;padding-bottom:0;">
+                            <div style="padding-top:8px;padding-bottom:8px;">
+                                <div class="w3-display-container w3-text-grey">
+                                    <span><b> {{ item.rotulo }} </b></span>
+                                    <span class="w3-display-right w3-display-hover w3-hover-opacity" @click="selecionado === index ? selecionado = -1 : selecionado = index">
+                                        <ui-icon :icon="selecionado === index ? 'times' : 'pencil'"></ui-icon>
+                                    </span>
+                                </div>
+                                <div v-if="item.valor" class="w3-tiny w3-text-blue" :style="cssDados">
+                                    {{ item.valor }} 
+                                </div>
+                                <div v-else class="w3-tiny w3-text-gray">
+                                     <em>Nenhuma informação cadastrada</em>
+                                </div>
+                            </div>
+                            <ui-animation-slide>
+                                <div v-show="selecionado === index" style="padding-top:8px;padding-bottom:8px;">
+                                    <div>
+                                        <textarea v-model.trim="item.novo" rows="2" style="width: 100%"></textarea>
+                                    </div>
+                                    <div style="padding-top:8px;padding-bottom:8px;">
+                                        <ui-button icon="cloud-upload"
+                                                :loading="atualizando === index" 
+                                                :disabled="item.novo === item.valor || item.novo.length === 0 || atualizando === index"
+                                                @click.native="atualizarRegistro(index)">
+                                                Salvar
+                                        </ui-button>
+                                    </div>
+                                </div>
+                            </ui-animation-slide>
+                        </li>
+                    </template>
+                    <template v-else>
+                        <li>
+                            <div class="w3-container w3-padding-16">
+                                <strong class="w3-text-grey">Nenhum dado encontrado</strong>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+    `,
+    data: function () {
+        return {
+            cssDados: {
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+            },
+            selecionado: -1,
+            atualizando: -1,
+            salvandoChave: false,
+            editarChave: false,
+        };
+    },
+    computed: {
+        chave() {
+            return this.$store.state.chaveGithub;
+        },
+        registro() {
+            return this.$store.state.registro;
+        }
+    },
+    methods: {
+        atualizarRegistro(index) {
+            this.atualizando = index;
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    var dados = JSON.parse(resposta);
+                    context.$log(dados);
+                    context.$store.commit('atualizarDadosRegistro', dados);
+                    context.atualizando = -1;
+                    context.selecionado = -1;
+                    context.$store.commit('notificarSucesso', '<p>Registro atualizado com sucesso.</p>');
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log('ERRO ===> ' + erro);
+                    context.atualizando = -1;
+                    context.selecionado = -1;
+                    context.$store.commit('notificarErro', erro.message);
+                })
+                .withUserObject(this)
+                .atualizarRegistro(this.registro[index].chave, this.registro[index].novo);
+        },
+        atualizarChave() {
+            this.salvandoChave = true;
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    var dados = JSON.parse(resposta);
+                    context.$log(dados);
+                    context.$store.commit('atualizarDadosChaveGithub', dados);
+                    context.atualizando = -1;
+                    context.editarChave = false;
+                    context.$store.commit('notificarSucesso', '<p>Chave atualizada com sucesso.</p>');
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log('ERRO ===> ' + erro);
+                    context.atualizando = -1;
+                    context.editarChave = false;
+                    context.$store.commit('notificarErro', erro.message);
+                })
+                .withUserObject(this)
+                .atualizarChaveGithub(this.chave.novo);
+        },
+        fechar() {
+            this.selecionado = -1;
+            this.atualizando = -1;
+            this.salvandoChave = false;
+            this.editarChave = false;
+        }
+    }
+});
+
+Vue.component('item-criar-documentacao', {
+    template: `
+        <div class="w3-card w3-white w3-margin">
+            <header class="w3-container" style="background-color: #FFCC80;">
+                <p>
+                    <ui-icon icon="book" fixed></ui-icon>
+                    Criar documentação
+                </p>
+            </header>
+            <div class="w3-container w3-padding-16">
+                <ui-button icon="file-text-o" :loading="criandoDocs" :disabled="criandoDocsMD" @click.native="criarDocs()">Google Docs</ui-button>
+                <ui-button icon="file-code-o" :loading="criandoDocsMD" :disabled="criandoDocs" @click.native="criarDocsMD()">Markdown</ui-button>
+            </div>
+        </div>
+        `,
+    data() {
+        return {
+            criandoDocs: false,
+            criandoDocsMD: false,
+        }
+    },
+    methods: {
+        criarDocs() {
+            this.criandoDocs = true;
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    var dados = JSON.parse(resposta);
+                    context.$log(dados);
+                    context.criandoDocs = false;
+                    context.$store.commit('notificarSucesso', dados || '<p>Nenhum resultado foi informado pelo servidor.</p>');
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log('ERRO ===> ' + erro);
+                    context.criandoDocs = false;
+                    context.$store.commit('notificarErro', erro.message);
+                })
+                .withUserObject(this)
+                .gerarDocumentacaoGoogleDocs();
+        },
+        criarDocsMD() {
+            this.criandoDocsMD = true;
+            this.$google.script.run
+                .withSuccessHandler(function (resposta, context) {
+                    var dados = JSON.parse(resposta);
+                    context.$log(resposta);
+                    context.criandoDocsMD = false;
+                    context.$store.commit('notificarSucesso', dados || '<p>Nenhum resultado foi informado pelo servidor.</p>');
+                })
+                .withFailureHandler(function (erro, context) {
+                    context.$log('ERRO ===> ' + erro);
+                    context.criandoDocsMD = false;
+                    context.$store.commit('notificarErro', erro.message);
+                })
+                .withUserObject(this)
+                .gerarDocumentacaoMarkdown();
+        },
+        fechar() {
+            this.criandoDocs = false;
+            this.criandoDocsMD = false;
+        }
+    },
+});
+
+Vue.component('item-limpar-planilha', {
+    template: `
+        <div>
+            <div v-if="planilha.pastaDesenvolvimento" class="w3-card w3-white w3-margin w3-padding w3-display-container">
+                <p>
+                    <span style="color: orangered;"><b>Cuidado. </b></span>
+                    Você está trabalhando na <b><u>pasta de desenvolvimento</u></b>.
+                    O uso destas utilidades pode comprometer a integridade das fontes.                
+                </p>
+                <p>Para usar as utilidades mesmo assim, clique no cadeado.</p>
+                <div v-if="planilha.pastaDesenvolvimento" class="w3-display-bottomright w3-padding">
+                    <ui-icon :icon="aberto ? 'unlock' : 'lock'" size="lg" class="w3-hover-opacity" @click.native="aberto = !aberto"></ui-icon>
+                </div>
+            </div>
+            <div class="w3-card w3-white w3-margin">
+                <header class="w3-container" style="background-color: #FFAB91;">
+                    <p>
+                        <ui-icon icon="square" fixed></ui-icon>
+                        Limpar intervalos
+                    </p>
+                </header>
+                <ui-animation-slide>
+                    <div v-show="aberto">
+                        <ul class="w3-ul">
+                            <li>
+                                <div class="w3-padding">
+                                    <ui-button :loading="apagandoDados" icon="eraser" :disabled="apagandoNotas" @click.native="apagarDados()">Dados</ui-button>
+                                    <ui-button :loading="apagandoNotas" icon="eraser" :disabled="apagandoDados" @click.native="apagarNotas()">Notas</ui-button>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </ui-animation-slide>
+            </div>
+            <div class="w3-card w3-white w3-margin">
+                <header class="w3-container" style="background-color: #FF8A65;">
+                    <p>
+                        <ui-icon icon="th" fixed></ui-icon>
+                        Limpar páginas
+                    </p>
+                </header>
+                <ui-animation-slide>
+                    <div v-show="aberto">
+                        <ul class="w3-ul">
+                            <li>
+                                <div class="w3-padding">
+                                    <ui-button :loading="excluindoPaginas" icon="trash" :disabled="ocultandoPaginas" @click.native="excluirPaginas()">Excluir</ui-button>
+                                    <ui-button :loading="ocultandoPaginas" icon="eye-slash" :disabled="excluindoPaginas" @click.native="ocultarPaginas()">Ocultar</ui-button>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </ui-animation-slide>
+            </div>
+        </div>
+    `,
+    data() {
+        return {
+            apagandoDados: false,
+            apagandoNotas: false,
+            ocultandoPaginas: false,
+            excluindoPaginas: false,
+            aberto: false,
+        }
+    },
+    computed: {
+        planilha() {
+            return this.$store.state.planilha;
+        }
+    },
+    methods: {
+        callbackSucesso(resposta) {
+            var dados = JSON.parse(resposta);
+            this.$log(dados);
+            this.finalizar();
+            this.$store.commit('notificarSucesso', dados || '<p>Nenhum resultado foi informado pelo servidor.</p>');
+        },
+        callbackErro(erro) {
+            this.$log('ERRO ===> ' + erro);
+            this.finalizar();
+            this.$store.commit('notificarErro', erro.message || MENSAGEM_ERRO_PADRAO);
+        },
+        finalizar() {
+            this.apagandoDados = false;
+            this.apagandoNotas = false;
+            this.ocultandoPaginas = false;
+            this.excluindoPaginas = false;
+        },
+        apagarDados() {
+            this.apagandoDados = true;
+            this.$google.script.run
+                .withSuccessHandler(this.callbackSucesso)
+                .withFailureHandler(this.callbackErro)
+                .withUserObject(this)
+                .apagarDados();
+        },
+        apagarNotas() {
+            this.apagandoNotas = true;
+            this.$google.script.run
+                .withSuccessHandler(this.callbackSucesso)
+                .withFailureHandler(this.callbackErro)
+                .withUserObject(this)
+                .apagarNotas();
+        },
+        excluirPaginas() {
+            this.excluindoPaginas = true;
+            this.$google.script.run
+                .withSuccessHandler(this.callbackSucesso)
+                .withFailureHandler(this.callbackErro)
+                .withUserObject(this)
+                .excluirPaginas();
+        },
+        ocultarPaginas() {
+            this.ocultandoPaginas = true;
+            this.$google.script.run
+                .withSuccessHandler(this.callbackSucesso)
+                .withFailureHandler(this.callbackErro)
+                .withUserObject(this)
+                .ocultarPaginas();
+        },
+    },
+    mounted() {
+        this.aberto = !this.planilha.pastaDesenvolvimento;
+    }
+});
+
+</script>
