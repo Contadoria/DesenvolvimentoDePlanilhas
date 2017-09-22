@@ -1,6 +1,6 @@
 ## Desenvolvimento de Planilhas
 
-Este repositório hospeda o site com a documentação do complemento "*Desenvolvimento de Planilhas*", desenvolvido em *Google Apps Script* pela **Contadoria**, organização criada no *Github*. O complemento facilita o desenvolvimento de planilhas de cálculo de benefícios previdenciários em *Google Sheets*.
+Este repositório hospeda a documentação do complemento "*Desenvolvimento de Planilhas*", desenvolvido em *Google Apps Script* pela **Contadoria**, organização criada no *Github*. O complemento facilita o desenvolvimento de planilhas de cálculo de benefícios previdenciários em *Google Sheets*.
 
 ### Características do complemento
 
